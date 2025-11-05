@@ -1,0 +1,45 @@
+# RNA-Protein Binding Prediction Configuration
+
+# Model architecture parameters
+model:
+  rna_seq_length: 101              # Fixed RNA sequence length (101 bp)
+  rna_input_dim: 4                  # One-hot encoding dimension for RNA (A, C, G, U)
+  protein_embedding_dim: 1280       # ESM2 embedding dimension
+  hidden_dim: 256                   # Hidden dimension for projection
+  num_attention_heads: 8            # Number of attention heads
+  num_layers: 3                     # Number of transformer layers
+  dropout: 0.1                      # Dropout rate
+  esm_model_name: "facebook/esm2_t33_650M_UR50D"  # ESM2 model for protein embedding
+
+# Data parameters
+data:
+  batch_size: 32                    # Batch size for training
+  train_split: 0.7                  # Training data split ratio
+  val_split: 0.15                   # Validation data split ratio
+  test_split: 0.15                  # Test data split ratio
+  num_workers: 4                    # Number of workers for data loading
+  shuffle: true                     # Shuffle data during training
+
+# Training parameters
+training:
+  epochs: 100                       # Number of training epochs
+  learning_rate: 0.001              # Initial learning rate
+  weight_decay: 0.0001              # Weight decay for regularization
+  early_stopping_patience: 15       # Early stopping patience
+  scheduler_patience: 5             # Learning rate scheduler patience
+  scheduler_factor: 0.5             # Learning rate reduction factor
+  grad_clip: 1.0                    # Gradient clipping value
+
+# Paths
+paths:
+  data_dir: "data"
+  model_dir: "models"
+  checkpoint_dir: "models/checkpoints"
+  log_dir: "logs"
+  output_dir: "output"
+
+# Other settings
+device: "cuda"                      # Device to use (cuda or cpu)
+seed: 42                            # Random seed for reproducibility
+save_best_only: true                # Save only the best model
+verbose: true                       # Print detailed information
