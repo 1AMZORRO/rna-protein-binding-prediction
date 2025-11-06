@@ -302,6 +302,35 @@ A: ESM2模型较大，首次运行需要下载。后续运行会使用缓存。�
 **Q: 可以只预测不训练吗？**
 A: 需要先训练模型或使用预训练的检查点，然后使用predict.py进行预测。
 
+## 网络问题
+当您看到以下错误时，说明您的网络环境无法访问 huggingface.co：
+
+```
+OSError: We couldn't connect to 'https://huggingface.co' to load this file...
+NameResolutionError: Failed to resolve 'huggingface.co'
+```
+
+这在以下情况中很常见：
+- 中国大陆的网络环境
+- 企业内网环境
+- 防火墙限制的服务器
+- 没有互联网连接的离线环境
+
+### 解决方案: 使用 Hugging Face 镜像站（最简单）
+
+如果您在中国大陆，可以使用官方镜像站：
+
+```bash
+# 临时使用（当前终端有效）
+export HF_ENDPOINT=https://hf-mirror.com
+
+# 永久使用（添加到 ~/.bashrc 或 ~/.zshrc）
+echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
+source ~/.bashrc
+```
+
+然后正常运行训练或预测命令：
+
 ## 引用
 
 如果使用本代码，请引用：
