@@ -16,6 +16,8 @@
 - Python >= 3.8
 - CUDA (可选，用于GPU加速)
 
+> **⚠️ 网络问题？** 如果无法访问 huggingface.co，请参考 [离线模式故障排除指南](docs/TROUBLESHOOTING_HUGGINGFACE.md)
+
 ### 安装依赖
 
 ```bash
