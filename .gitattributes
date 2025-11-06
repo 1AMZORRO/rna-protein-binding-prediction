@@ -1,0 +1,2 @@
+data/trains/*.fasta filter=lfs diff=lfs merge=lfs -text
+data/trains/*.txt filter=lfs diff=lfs merge=lfs -text
