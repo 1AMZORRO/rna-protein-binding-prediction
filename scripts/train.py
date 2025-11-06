@@ -160,9 +160,12 @@ def main():
     
     # Note: ESM2 model loading can take some time and requires internet connection
     # Use a smaller model for faster initialization during development
+    # For offline mode, download the model first and set local_esm_model_path in config
+    local_model_path = config['model'].get('local_esm_model_path', None)
     protein_processor = ProteinProcessor(
         model_name=config['model']['esm_model_name'],
-        device=device
+        device=device,
+        local_model_path=local_model_path
     )
     
     # Create data loaders

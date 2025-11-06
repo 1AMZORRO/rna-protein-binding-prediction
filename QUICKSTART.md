@@ -53,6 +53,7 @@ python scripts/train.py \
 
 **注意**: 
 - 首次运行会下载ESM2模型（约2.5GB）
+- 如果无法访问 huggingface.co，请参考下方的"离线模式"部分
 - 建议使用GPU，CPU训练会很慢
 - 可在 `config/config.yaml` 中调整参数
 
@@ -116,6 +117,55 @@ LMNPQRSTVWYACDEF...
 每行一个数字（1=结合，0=不结合），顺序与FASTA一致。
 
 ## 常见问题
+
+**Q: 无法访问 huggingface.co 怎么办？（离线模式）**
+
+这是中国大陆等网络受限环境的常见问题。解决方法：
+
+### 快速解决（使用镜像）
+```bash
+# 设置环境变量使用 Hugging Face 镜像
+export HF_ENDPOINT=https://hf-mirror.com
+
+# 然后正常运行训练
+python scripts/train.py --config config/config.yaml
+```
+
+### 离线模式（推荐）
+如果完全无法联网，需要先在有网络的环境下载模型：
+
+1. **在有网络的机器上下载模型**：
+```python
+from transformers import AutoModel, AutoTokenizer
+
+# 下载并保存模型
+model = AutoModel.from_pretrained("facebook/esm2_t33_650M_UR50D")
+tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
+model.save_pretrained("./esm2_model")
+tokenizer.save_pretrained("./esm2_model")
+```
+
+2. **将 esm2_model 目录复制到无网络的机器**
+
+3. **修改 config/config.yaml**：
+```yaml
+model:
+  local_esm_model_path: "./esm2_model"  # 设置本地模型路径
+```
+
+4. **正常运行训练**：
+```bash
+python scripts/train.py --config config/config.yaml
+```
+
+### 使用更小的模型（推荐初学者）
+```yaml
+# 修改 config/config.yaml
+model:
+  esm_model_name: "facebook/esm2_t12_35M_UR50D"  # 仅140MB，更快
+  protein_embedding_dim: 480  # 对应 t12 模型的嵌入维度
+  local_esm_model_path: "./esm2_t12_model"  # 可选
+```
 
 **Q: 显存不足怎么办？**
 ```yaml

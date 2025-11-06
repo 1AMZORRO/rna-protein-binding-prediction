@@ -302,6 +302,88 @@ A: ESM2模型较大，首次运行需要下载。后续运行会使用缓存。�
 **Q: 可以只预测不训练吗？**
 A: 需要先训练模型或使用预训练的检查点，然后使用predict.py进行预测。
 
+**Q: 无法访问 huggingface.co 怎么办？（离线模式）**
+
+A: 如果您的网络环境无法访问 Hugging Face（例如在内网服务器上），可以使用离线模式：
+
+### 方法1: 在有网络的环境下载模型
+
+```python
+# 在可以访问 huggingface.co 的环境中运行
+from transformers import AutoModel, AutoTokenizer
+
+model_name = "facebook/esm2_t33_650M_UR50D"
+
+# 下载模型和tokenizer
+model = AutoModel.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+# 保存到本地目录
+model.save_pretrained("./esm2_model")
+tokenizer.save_pretrained("./esm2_model")
+```
+
+### 方法2: 手动下载模型文件
+
+访问 https://huggingface.co/facebook/esm2_t33_650M_UR50D/tree/main 下载所有文件：
+- config.json
+- pytorch_model.bin
+- tokenizer_config.json
+- vocab.txt
+- special_tokens_map.json
+- 其他相关文件
+
+将所有文件放在同一个目录下（例如 `./esm2_model`）。
+
+### 方法3: 使用镜像站点
+
+如果在中国大陆，可以使用 Hugging Face 的镜像站点：
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+```
+
+### 配置离线模式
+
+下载完模型后，修改 `config/config.yaml`：
+
+```yaml
+model:
+  esm_model_name: "facebook/esm2_t33_650M_UR50D"
+  local_esm_model_path: "./esm2_model"  # 设置为本地模型路径
+```
+
+或者使用绝对路径：
+```yaml
+model:
+  local_esm_model_path: "/data/models/esm2_model"
+```
+
+然后正常运行训练或预测命令：
+```bash
+python scripts/train.py --config config/config.yaml --rna-fasta ... --protein-fasta ... --labels ...
+```
+
+程序会自动从本地路径加载模型，不会尝试连接 Hugging Face。
+
+### 推荐使用更小的模型（节省空间和时间）
+
+如果需要更快的下载和加载速度，可以使用更小的ESM2模型：
+
+| 模型名称 | 参数量 | 嵌入维度 | 模型大小 |
+|---------|--------|---------|----------|
+| facebook/esm2_t33_650M_UR50D | 650M | 1280 | ~2.5GB |
+| facebook/esm2_t30_150M_UR50D | 150M | 640 | ~600MB |
+| facebook/esm2_t12_35M_UR50D | 35M | 480 | ~140MB |
+
+使用更小的模型需要同时修改配置文件中的 `protein_embedding_dim`：
+
+```yaml
+model:
+  esm_model_name: "facebook/esm2_t12_35M_UR50D"
+  protein_embedding_dim: 480  # 对应 t12 模型
+  local_esm_model_path: "./esm2_t12_model"  # 可选，离线模式
+```
+
 ## 引用
 
 如果使用本代码，请引用：

@@ -10,6 +10,7 @@ model:
   num_layers: 3                     # Number of transformer layers
   dropout: 0.1                      # Dropout rate
   esm_model_name: "facebook/esm2_t33_650M_UR50D"  # ESM2 model for protein embedding
+  local_esm_model_path: null        # Path to local ESM2 model (for offline mode, set to model directory path)
 
 # Data parameters
 data:

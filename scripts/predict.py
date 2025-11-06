@@ -143,9 +143,11 @@ def main():
     # Initialize processors
     print("Initializing RNA and Protein processors...")
     rna_processor = RNAProcessor(seq_length=config['model']['rna_seq_length'])
+    local_model_path = config['model'].get('local_esm_model_path', None)
     protein_processor = ProteinProcessor(
         model_name=config['model']['esm_model_name'],
-        device=device
+        device=device,
+        local_model_path=local_model_path
     )
     
     # Load data
