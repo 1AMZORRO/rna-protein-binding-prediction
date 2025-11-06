@@ -28,6 +28,7 @@ class ProteinProcessor:
         
         # Determine the model path to use
         model_path = local_model_path if local_model_path else model_name
+        use_local_only = local_model_path is not None
         
         # Load ESM2 tokenizer and model
         if local_model_path:
@@ -37,8 +38,8 @@ class ProteinProcessor:
         
         try:
             # Try to load from local path or download
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=bool(local_model_path))
-            self.model = AutoModel.from_pretrained(model_path, local_files_only=bool(local_model_path))
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=use_local_only)
+            self.model = AutoModel.from_pretrained(model_path, local_files_only=use_local_only)
         except Exception as e:
             if local_model_path:
                 raise RuntimeError(

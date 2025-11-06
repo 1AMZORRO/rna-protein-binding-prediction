@@ -158,7 +158,15 @@ def verify_model(model_path):
         print(f"✗ 路径不存在: {model_path}")
         return False
     
-    required_files = ["config.json", "pytorch_model.bin"]
+    required_files = [
+        "config.json", 
+        "pytorch_model.bin",
+        "tokenizer_config.json",
+        "vocab.txt"
+    ]
+    # Special tokens map is optional in some models
+    optional_files = ["special_tokens_map.json"]
+    
     missing_files = []
     
     for file in required_files:
@@ -166,8 +174,17 @@ def verify_model(model_path):
             missing_files.append(file)
     
     if missing_files:
-        print(f"✗ 模型文件不完整，缺少: {', '.join(missing_files)}")
+        print(f"✗ 模型文件不完整，缺少必需文件: {', '.join(missing_files)}")
         return False
+    
+    # Check optional files and warn
+    missing_optional = []
+    for file in optional_files:
+        if not (model_path / file).exists():
+            missing_optional.append(file)
+    
+    if missing_optional:
+        print(f"⚠ 警告: 缺少可选文件: {', '.join(missing_optional)}")
     
     print(f"✓ 模型文件完整: {model_path}")
     return True
