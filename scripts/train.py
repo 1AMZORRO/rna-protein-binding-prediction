@@ -131,6 +131,8 @@ def main():
                         help='Path to labels file')
     parser.add_argument('--output-dir', type=str, default=None,
                         help='Output directory for checkpoints')
+    parser.add_argument('--use-precomputed-embeddings', action='store_true',
+                        help='Use precomputed protein embeddings from config file')
     
     args = parser.parse_args()
     
@@ -158,11 +160,22 @@ def main():
     print("Initializing RNA and Protein processors...")
     rna_processor = RNAProcessor(seq_length=config['model']['rna_seq_length'])
     
+    # Determine if using precomputed embeddings
+    precomputed_embeddings_path = None
+    if args.use_precomputed_embeddings:
+        precomputed_embeddings_path = config['model'].get('precomputed_embeddings')
+        if precomputed_embeddings_path:
+            print(f"Using precomputed protein embeddings from: {precomputed_embeddings_path}")
+        else:
+            print("Warning: --use-precomputed-embeddings specified but no path in config")
+            print("Will load ESM2 model instead")
+    
     # Note: ESM2 model loading can take some time and requires internet connection
     # Use a smaller model for faster initialization during development
     protein_processor = ProteinProcessor(
         model_name=config['model']['esm_model_name'],
-        device=device
+        device=device,
+        precomputed_embeddings_path=precomputed_embeddings_path
     )
     
     # Create data loaders
@@ -174,12 +187,16 @@ def main():
             with open(args.labels, 'r') as f:
                 labels_list = [int(line.strip()) for line in f]
         
+        # If using precomputed embeddings, we need protein IDs for lookup
+        use_protein_ids = args.use_precomputed_embeddings and precomputed_embeddings_path is not None
+        
         dataset = RNAProteinDataset.from_fasta_files(
             rna_fasta=args.rna_fasta,
             protein_fasta=args.protein_fasta,
             labels=labels_list,
             rna_processor=rna_processor,
-            protein_processor=protein_processor
+            protein_processor=protein_processor,
+            use_protein_ids=use_protein_ids
         )
         
         # Split dataset
