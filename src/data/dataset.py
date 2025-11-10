@@ -19,7 +19,8 @@ class RNAProteinDataset(Dataset):
         protein_sequences: List[str],
         labels: Optional[List[int]] = None,
         rna_processor=None,
-        protein_processor=None
+        protein_processor=None,
+        protein_ids: Optional[List[str]] = None
     ):
         """
         Initialize dataset.
@@ -30,16 +31,21 @@ class RNAProteinDataset(Dataset):
             labels: List of binary labels (1 for binding, 0 for non-binding)
             rna_processor: RNAProcessor instance
             protein_processor: ProteinProcessor instance
+            protein_ids: Optional list of protein IDs for precomputed embeddings
         """
         self.rna_sequences = rna_sequences
         self.protein_sequences = protein_sequences
         self.labels = labels if labels is not None else [1] * len(rna_sequences)
+        self.protein_ids = protein_ids
         
         # Check that all lists have the same length
         assert len(self.rna_sequences) == len(self.protein_sequences), \
             "RNA and protein sequences must have the same length"
         assert len(self.rna_sequences) == len(self.labels), \
             "Labels must have the same length as sequences"
+        if protein_ids is not None:
+            assert len(self.rna_sequences) == len(self.protein_ids), \
+                "Protein IDs must have the same length as sequences"
         
         self.rna_processor = rna_processor
         self.protein_processor = protein_processor
@@ -57,6 +63,7 @@ class RNAProteinDataset(Dataset):
         rna_seq = self.rna_sequences[idx]
         protein_seq = self.protein_sequences[idx]
         label = self.labels[idx]
+        protein_id = self.protein_ids[idx] if self.protein_ids else None
         
         # Encode sequences
         if self.rna_processor is not None:
@@ -65,7 +72,10 @@ class RNAProteinDataset(Dataset):
             rna_emb = torch.zeros(101, 4)  # Placeholder
             
         if self.protein_processor is not None:
-            protein_emb = self.protein_processor.encode_sequence(protein_seq)
+            protein_emb = self.protein_processor.encode_sequence(
+                protein_seq, 
+                protein_id=protein_id
+            )
         else:
             protein_emb = torch.zeros(100, 1280)  # Placeholder
         
@@ -91,12 +101,32 @@ class RNAProteinDataset(Dataset):
         return sequences
     
     @staticmethod
+    def load_fasta_with_ids(fasta_file: str) -> Tuple[List[str], List[str]]:
+        """
+        Load sequences and IDs from FASTA file.
+        
+        Args:
+            fasta_file: Path to FASTA file
+            
+        Returns:
+            Tuple of (sequences, ids)
+        """
+        sequences = []
+        ids = []
+        with open(fasta_file, 'r') as f:
+            for record in SeqIO.parse(f, 'fasta'):
+                sequences.append(str(record.seq))
+                ids.append(record.id)
+        return sequences, ids
+    
+    @staticmethod
     def from_fasta_files(
         rna_fasta: str,
         protein_fasta: str,
         labels: Optional[List[int]] = None,
         rna_processor=None,
-        protein_processor=None
+        protein_processor=None,
+        use_protein_ids: bool = False
     ):
         """
         Create dataset from FASTA files.
@@ -107,19 +137,26 @@ class RNAProteinDataset(Dataset):
             labels: Optional list of labels
             rna_processor: RNAProcessor instance
             protein_processor: ProteinProcessor instance
+            use_protein_ids: Whether to extract and use protein IDs for precomputed embeddings
             
         Returns:
             RNAProteinDataset instance
         """
         rna_sequences = RNAProteinDataset.load_fasta(rna_fasta)
-        protein_sequences = RNAProteinDataset.load_fasta(protein_fasta)
+        
+        if use_protein_ids:
+            protein_sequences, protein_ids = RNAProteinDataset.load_fasta_with_ids(protein_fasta)
+        else:
+            protein_sequences = RNAProteinDataset.load_fasta(protein_fasta)
+            protein_ids = None
         
         return RNAProteinDataset(
             rna_sequences,
             protein_sequences,
             labels,
             rna_processor,
-            protein_processor
+            protein_processor,
+            protein_ids
         )
 
 

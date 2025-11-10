@@ -46,6 +46,18 @@ output/
 # data/raw/
 # data/processed/
 
+# Large FASTA files
+168_train.fasta
+*.fasta.gz
+
+# Mapping files (too large for git)
+rna_protein_mapping.txt
+rna_protein_mapping.json
+168_train_labels.txt
+
+# Precomputed embeddings
+precomputed_protein_embeddings.pt
+
 # OS
 .DS_Store
 Thumbs.db

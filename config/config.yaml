@@ -9,7 +9,11 @@ model:
   num_attention_heads: 8            # Number of attention heads
   num_layers: 3                     # Number of transformer layers
   dropout: 0.1                      # Dropout rate
-  esm_model_name: "facebook/esm2_t33_650M_UR50D"  # ESM2 model for protein embedding
+  esm_model_name: "esm2_t33_650M_UR50D"  # ESM2 model name (not Hugging Face format)
+  # Available models: esm2_t6_8M_UR50D, esm2_t12_35M_UR50D, esm2_t30_150M_UR50D, 
+  #                   esm2_t33_650M_UR50D, esm2_t36_3B_UR50D
+  precomputed_embeddings: null         # Path to precomputed protein embeddings (optional)
+  # Example: "precomputed_protein_embeddings.pt"
 
 # Data parameters
 data:

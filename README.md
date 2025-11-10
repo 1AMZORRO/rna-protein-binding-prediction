@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 主要依赖包括：
 - `torch>=1.9.0` - PyTorch深度学习框架
-- `transformers>=4.20.0` - Hugging Face Transformers库，用于ESM2模型
+- `fair-esm>=2.0.0` - Facebook ESM库，直接使用ESM2预训练模型
 - `biopython>=1.79` - 生物信息学工具，用于处理FASTA文件
 - `scikit-learn>=1.0.0` - 评估指标计算
 - `matplotlib>=3.5.0` - 绘图工具
@@ -33,6 +33,61 @@ pip install -r requirements.txt
 - `tqdm>=4.64.0` - 进度条显示
 - `numpy>=1.21.0` - 数值计算
 - `pandas>=1.3.0` - 数据处理
+
+## 数据准备
+
+### 1. 合并训练数据
+
+本项目提供了8个部分的RNA序列文件（part1.fasta到part8.fasta）。首先需要将它们合并为一个完整的训练文件：
+
+```bash
+cat part1.fasta part2.fasta part3.fasta part4.fasta part5.fasta part6.fasta part7.fasta part8.fasta > 168_train.fasta
+```
+
+合并后的`168_train.fasta`包含1,245,616个RNA序列，对应168个不同的蛋白质。
+
+### 2. 建立RNA序列、标签与蛋白质的对应关系
+
+运行以下脚本来创建RNA序列、标签信息与蛋白质embeddings之间的映射：
+
+```bash
+python scripts/create_rna_protein_mapping.py \
+    --rna-fasta 168_train.fasta \
+    --protein-fasta prot_seqs.fasta \
+    --output-mapping rna_protein_mapping.txt \
+    --output-json rna_protein_mapping.json \
+    --output-labels 168_train_labels.txt
+```
+
+这将生成三个文件：
+- `rna_protein_mapping.txt` - TSV格式，包含RNA_ID、RNA序列、Protein_ID和Label
+- `rna_protein_mapping.json` - JSON格式，包含元数据和完整映射
+- `168_train_labels.txt` - 纯标签文件，每行一个标签（1=结合，0=不结合）
+
+### 3. 预计算蛋白质Embeddings（推荐）
+
+为了避免每次训练都重复计算蛋白质embeddings，建议预先计算所有168个蛋白质的embeddings：
+
+```bash
+python scripts/precompute_protein_embeddings.py \
+    --protein-fasta prot_seqs.fasta \
+    --output precomputed_protein_embeddings.pt \
+    --model-name esm2_t33_650M_UR50D \
+    --device cuda
+```
+
+参数说明：
+- `--protein-fasta`: 蛋白质序列文件（prot_seqs.fasta包含168个蛋白质）
+- `--output`: 输出的embeddings文件路径
+- `--model-name`: ESM2模型名称，可选：
+  - `esm2_t6_8M_UR50D` - 最小模型，8M参数
+  - `esm2_t12_35M_UR50D` - 小模型，35M参数
+  - `esm2_t30_150M_UR50D` - 中型模型，150M参数
+  - `esm2_t33_650M_UR50D` - 大模型，650M参数（默认）
+  - `esm2_t36_3B_UR50D` - 超大模型，3B参数
+- `--device`: 使用cuda（GPU）或cpu
+
+**注意**: 首次运行会自动下载ESM2模型（约2.5GB），后续运行将使用缓存。预计算完成后，训练时将直接加载预计算的embeddings，大幅提升速度。
 
 ## 快速开始
 
@@ -49,9 +104,9 @@ python scripts/generate_example_data.py
 - `protein_sequences.fasta` - 蛋白质序列文件
 - `labels.txt` - 结合标签文件（1表示结合，0表示不结合）
 
-### 2. 配置设置
+### 2. 配置设置（使用预计算embeddings）
 
-配置文件位于 `config/config.yaml`，主要参数包括：
+如果已经预计算了蛋白质embeddings，可以在配置文件中指定：
 
 ```yaml
 model:
@@ -61,6 +116,8 @@ model:
   hidden_dim: 256               # 隐藏层维度
   num_attention_heads: 8        # 注意力头数
   num_layers: 3                 # Transformer层数
+  esm_model_name: esm2_t33_650M_UR50D  # ESM2模型名称
+  precomputed_embeddings: precomputed_protein_embeddings.pt  # 预计算的embeddings路径
 
 data:
   batch_size: 32                # 批次大小
@@ -73,21 +130,28 @@ training:
 
 ### 3. 模型训练
 
-使用示例数据训练（模型会自动生成模拟数据）：
-
-```bash
-python scripts/train.py --config config/config.yaml
-```
-
-使用自己的FASTA文件训练：
+**使用预计算embeddings训练（推荐）**：
 
 ```bash
 python scripts/train.py \
     --config config/config.yaml \
-    --rna-fasta data/examples/rna_sequences.fasta \
-    --protein-fasta data/examples/protein_sequences.fasta \
-    --labels data/examples/labels.txt
+    --rna-fasta 168_train.fasta \
+    --protein-fasta prot_seqs.fasta \
+    --labels 168_train_labels.txt \
+    --use-precomputed-embeddings
 ```
+
+**不使用预计算embeddings训练**：
+
+```bash
+python scripts/train.py \
+    --config config/config.yaml \
+    --rna-fasta 168_train.fasta \
+    --protein-fasta prot_seqs.fasta \
+    --labels 168_train_labels.txt
+```
+
+注意：不使用预计算embeddings时，每个epoch都需要重新计算蛋白质embeddings，训练速度会很慢。
 
 训练过程中会：
 - 保存最佳模型到 `models/checkpoints/best_model.pth`
@@ -145,9 +209,11 @@ python tests/test_basic.py
 
 2. **蛋白质序列处理** (`ProteinProcessor`)
    - 输入：蛋白质序列字符串（如 "ACDEFGH..."）
-   - 处理：
-     - 使用ESM2预训练模型 (`facebook/esm2_t33_650M_UR50D`) 生成embedding
-     - 自动移除特殊token（CLS和EOS）
+   - 处理方式：
+     - **使用fair-esm库直接加载ESM2预训练模型**（不再使用Hugging Face Transformers）
+     - 支持多种ESM2模型变体（8M到3B参数）
+     - 自动移除特殊token（BOS和EOS）
+     - **支持预计算embeddings**：可以预先计算所有蛋白质的embeddings并保存，训练时直接加载
    - 输出：形状为 (seq_length, 1280) 的张量
 
 ### 核心架构
@@ -275,13 +341,16 @@ LMNPQRSTVWYACDEFGHIKLMNPQRSTVWYACDEFGHIKL
    - RNA序列应为101 bp长度（会自动填充或截断）
    - 蛋白质序列可以是任意长度
    - 确保RNA和蛋白质序列数量一致
+   - **强烈推荐**：使用预计算的蛋白质embeddings以加速训练
 
 2. **训练优化**
+   - **使用预计算embeddings**：避免每次训练都重新计算蛋白质embeddings（本项目168个蛋白质对应124万个RNA序列）
    - 建议使用GPU进行训练（ESM2模型较大）
    - 如果显存不足，可以：
      - 减小batch_size
      - 减小hidden_dim
-     - 使用更小的ESM2模型（如 `facebook/esm2_t12_35M_UR50D`）
+     - 使用更小的ESM2模型（如 `esm2_t12_35M_UR50D` 或 `esm2_t6_8M_UR50D`）
+   - 预计算embeddings后，训练时直接从内存加载，速度提升数百倍
 
 3. **模型调优**
    - 调整num_attention_heads和num_layers
@@ -290,46 +359,58 @@ LMNPQRSTVWYACDEFGHIKLMNPQRSTVWYACDEFGHIKL
 
 ## 常见问题
 
+**Q: 训练速度很慢怎么办？**
+A: 
+1. **最重要**：使用预计算的蛋白质embeddings（见"数据准备"部分）
+2. 使用GPU加速
+3. 使用更小的ESM2模型（如 `esm2_t12_35M_UR50D`）
+4. 减小batch_size
+
 **Q: 训练时显存不足怎么办？**
-A: 减小batch_size，或使用更小的ESM2模型，或使用CPU训练（速度会较慢）。
+A: 减小batch_size，或使用更小的ESM2模型，或使用CPU训练（速度会较慢），或使用预计算embeddings（不需要在训练时加载ESM2模型）。
 
 **Q: 如何使用自己的eCLIP-seq数据？**
-A: 将RNA序列和蛋白质序列分别保存为FASTA格式，标签保存为文本文件，每行一个0或1。
+A: 
+1. 将RNA序列保存为FASTA格式
+2. 将蛋白质序列保存为FASTA格式
+3. 标签保存为文本文件，每行一个0或1
+4. 运行`create_rna_protein_mapping.py`建立映射关系
+5. 运行`precompute_protein_embeddings.py`预计算蛋白质embeddings（推荐）
 
 **Q: 预测速度很慢怎么办？**
-A: ESM2模型较大，首次运行需要下载。后续运行会使用缓存。建议使用GPU加速。
+A: 使用预计算的蛋白质embeddings。首次运行ESM2需要下载模型（约2.5GB），后续运行会使用缓存。建议使用GPU加速。
 
 **Q: 可以只预测不训练吗？**
 A: 需要先训练模型或使用预训练的检查点，然后使用predict.py进行预测。
 
-## 网络问题
-当您看到以下错误时，说明您的网络环境无法访问 huggingface.co：
+## ESM模型相关
 
-```
-OSError: We couldn't connect to 'https://huggingface.co' to load this file...
-NameResolutionError: Failed to resolve 'huggingface.co'
-```
+### ESM模型加载方式变更
 
-这在以下情况中很常见：
-- 中国大陆的网络环境
-- 企业内网环境
-- 防火墙限制的服务器
-- 没有互联网连接的离线环境
+本项目已从使用 Hugging Face Transformers 库切换到直接使用 Facebook 的 fair-esm 库：
 
-### 解决方案: 使用 Hugging Face 镜像站（最简单）
+```python
+import esm
+from esm import pretrained
 
-如果您在中国大陆，可以使用官方镜像站：
-
-```bash
-# 临时使用（当前终端有效）
-export HF_ENDPOINT=https://hf-mirror.com
-
-# 永久使用（添加到 ~/.bashrc 或 ~/.zshrc）
-echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
-source ~/.bashrc
+# 加载模型
+model, alphabet = pretrained.esm2_t33_650M_UR50D()
 ```
 
-然后正常运行训练或预测命令：
+这种方式的优点：
+- 直接使用官方实现，更稳定
+- 支持更多ESM模型变体
+- 更好的性能和兼容性
+
+### 网络问题
+
+ESM2模型文件会从 Facebook 服务器下载（约2.5GB）。如果遇到网络问题：
+
+1. **使用代理**：设置HTTP/HTTPS代理
+2. **离线使用**：提前下载模型文件到 `~/.cache/torch/hub/checkpoints/`
+3. **使用预计算embeddings**：一旦embeddings计算完成，后续训练不需要再加载ESM2模型
+
+注意：本项目不再使用Hugging Face服务，因此不需要配置HF_ENDPOINT镜像站。
 
 ## 引用
 
